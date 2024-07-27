@@ -5,8 +5,7 @@ namespace App\Entity;
 use App\Repository\TaskRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
-
-
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: TaskRepository::class)]
 class Task
@@ -17,9 +16,11 @@ class Task
   private ?int $id = null;
 
   #[ORM\Column(length: 255)]
+  #[Assert\NotBlank(message: 'El título es requerido')]
   private ?string $title = null;
 
   #[ORM\Column(type: Types::TEXT)]
+  #[Assert\NotBlank(message: 'La descripción es requerido')]
   private ?string $description = null;
 
   #[ORM\Column(length: 255, options: ['default' => Status::STATUS_PENDING->value])]
@@ -29,6 +30,11 @@ class Task
   private ?int $num_order = null;
 
   #[ORM\Column(length: 255)]
+  #[Assert\NotBlank(message: 'La prioridad es requerida')]
+  #[Assert\Choice(
+    callback: [Priority::class, 'values'],
+    message: 'La prioridad no es válida. Los valores permitidos son alta, media o baja.'
+  )]
   private ?string $priority = null;
 
   #[ORM\Column(type: Types::BOOLEAN, options: ['default' => false])]
@@ -103,9 +109,9 @@ class Task
     return Priority::from($this->priority);
   }
 
-  public function setPriority(Priority $priority): static
+  public function setPriority(?string $priority): static
   {
-    $this->priority = $priority->value;
+    $this->priority = $priority;
 
     return $this;
   }

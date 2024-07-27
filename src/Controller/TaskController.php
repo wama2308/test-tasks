@@ -18,7 +18,8 @@ use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\Serializer\Normalizer\AbstractNormalizer;
 use Symfony\Component\HttpFoundation\JsonResponse;
-
+use Symfony\Component\Validator\Validator\ValidatorInterface;
+use App\Helpers\JsonHelper;
 
 /**
  * @Route("/api/tasks", name="task_api")
@@ -28,12 +29,16 @@ class TaskController extends AbstractController
   private $entityManager;
   private $taskRepository;
   private $serializer;
+  private $validator;
+  private $jsonHelper;
 
-  public function __construct(EntityManagerInterface $entityManager, TaskRepository $taskRepository, SerializerInterface $serializer)
+  public function __construct(EntityManagerInterface $entityManager, TaskRepository $taskRepository, SerializerInterface $serializer, ValidatorInterface $validator, JsonHelper $jsonHelper )
   {
     $this->entityManager = $entityManager;
     $this->taskRepository = $taskRepository;
     $this->serializer = $serializer;
+    $this->validator = $validator;
+    $this->jsonHelper = $jsonHelper;
   }
 
   /**
@@ -61,35 +66,43 @@ class TaskController extends AbstractController
    */
   public function create(Request $request): Response
   {
-    $taskData = $this->getRequestData($request);
+    $taskData = $this->jsonHelper->getRequestData($request);
     if ($taskData instanceof Response) {
       return $taskData;
     }
 
-    $validationErrors = $this->validateTaskData($taskData);
-    if (!empty($validationErrors)) {
-      return $this->createApiResponse(false, $validationErrors, Response::HTTP_BAD_REQUEST);
+    $task = new Task();
+    $task->setTitle($taskData['title']);
+    $task->setDescription($taskData['description']);
+    $task->setPriority($taskData['priority']);
+    $task->setNumOrder($this->taskRepository->getNewTaskOrder());
+
+    $errors = $this->validator->validate($task);
+
+    if (count($errors) > 0) {
+      $errorsArray = [];
+      foreach ($errors as $error) {
+
+        $field = $error->getPropertyPath();
+        if (!array_key_exists($field, $errorsArray)) {
+          $errorsArray[$field] = $error->getMessage();
+        }
+      }
+      return $this->jsonHelper->createApiResponse(false, $errorsArray, Response::HTTP_BAD_REQUEST);
     }
 
     try {
       $this->entityManager->getConnection()->beginTransaction();
-
-      $newOrder = $this->getNewTaskOrder();
-      $task = new Task();
-      $task->setTitle($taskData['title']);
-      $task->setDescription($taskData['description']);
-      $task->setNumOrder($newOrder);
-      $task->setPriority(Priority::from($taskData['priority']));
 
       $this->entityManager->persist($task);
       $this->entityManager->flush();
       $this->entityManager->getConnection()->commit();
 
       $data = $this->serializer->serialize($task, 'json');
-      return $this->createApiResponse(true, 'Tarea creada con éxito', Response::HTTP_CREATED, ['task' => json_decode($data)]);
+      return $this->jsonHelper->createApiResponse(true, 'Tarea creada con éxito', Response::HTTP_CREATED, ['task' => json_decode($data)]);
     } catch (\Exception $e) {
       $this->entityManager->getConnection()->rollBack();
-      return $this->createApiResponse(false, 'Error creando la tarea', Response::HTTP_INTERNAL_SERVER_ERROR, ['details' => $e->getMessage()]);
+      return $this->jsonHelper->createApiResponse(false, 'Error creando la tarea', Response::HTTP_INTERNAL_SERVER_ERROR, ['details' => $e->getMessage()]);
     }
   }
 
@@ -98,36 +111,41 @@ class TaskController extends AbstractController
    */
   public function update(Request $request, $id): Response
   {
-    $task = $this->taskRepository->find($id);
-    if (!$task) {
-      return $this->createApiResponse(false, 'Tarea no encontrada', Response::HTTP_NOT_FOUND);
-    }
-
-    $taskData = $this->getRequestData($request);
+    $taskData = $this->jsonHelper->getRequestData($request);
     if ($taskData instanceof Response) {
       return $taskData;
     }
 
-    $validationErrors = $this->validateTaskData($taskData);
-    if (!empty($validationErrors)) {
-      return $this->createApiResponse(false, $validationErrors, Response::HTTP_BAD_REQUEST);
+    $task = new Task();
+    $task->setTitle($taskData['title']);
+    $task->setDescription($taskData['description']);
+    $task->setPriority($taskData['priority']);
+
+    $errors = $this->validator->validate($task);
+
+    if (count($errors) > 0) {
+      $errorsArray = [];
+      foreach ($errors as $error) {
+
+        $field = $error->getPropertyPath();
+        if (!array_key_exists($field, $errorsArray)) {
+          $errorsArray[$field] = $error->getMessage();
+        }
+      }
+      return $this->jsonHelper->createApiResponse(false, $errorsArray, Response::HTTP_BAD_REQUEST);
     }
 
     try {
       $this->entityManager->getConnection()->beginTransaction();
 
-      $task->setTitle($taskData['title']);
-      $task->setDescription($taskData['description']);
-      $task->setPriority(Priority::from($taskData['priority']));
-
       $this->entityManager->flush();
       $this->entityManager->getConnection()->commit();
 
       $data = $this->serializer->serialize($task, 'json');
-      return $this->createApiResponse(true, 'Tarea modificada con éxito', Response::HTTP_OK, ['task' => json_decode($data)]);
+      return $this->jsonHelper->createApiResponse(true, 'Tarea modificada con éxito', Response::HTTP_OK, ['task' => json_decode($data)]);
     } catch (\Exception $e) {
       $this->entityManager->getConnection()->rollBack();
-      return $this->createApiResponse(false, 'Error modificando la tarea', Response::HTTP_INTERNAL_SERVER_ERROR, ['details' => $e->getMessage()]);
+      return $this->jsonHelper->createApiResponse(false, 'Error modificando la tarea', Response::HTTP_INTERNAL_SERVER_ERROR, ['details' => $e->getMessage()]);
     }
   }
 
@@ -138,7 +156,7 @@ class TaskController extends AbstractController
   {
     $task = $this->taskRepository->find($id);
     if (!$task) {
-      return $this->createApiResponse(false, 'Tarea no encontrada', Response::HTTP_NOT_FOUND);
+      return $this->jsonHelper->createApiResponse(false, 'Tarea no encontrada', Response::HTTP_NOT_FOUND);
     }
 
     try {
@@ -151,10 +169,10 @@ class TaskController extends AbstractController
       $this->entityManager->getConnection()->commit();
 
       $data = $this->serializer->serialize($task, 'json');
-      return $this->createApiResponse(true, 'Tarea completada con éxito', Response::HTTP_OK, ['task' => json_decode($data)]);
+      return $this->jsonHelper->createApiResponse(true, 'Tarea completada con éxito', Response::HTTP_OK, ['task' => json_decode($data)]);
     } catch (\Exception $e) {
       $this->entityManager->getConnection()->rollBack();
-      return $this->createApiResponse(false, 'Error modificando el estatus de la tarea', Response::HTTP_INTERNAL_SERVER_ERROR, ['details' => $e->getMessage()]);
+      return $this->jsonHelper->createApiResponse(false, 'Error modificando el estatus de la tarea', Response::HTTP_INTERNAL_SERVER_ERROR, ['details' => $e->getMessage()]);
     }
   }
 
@@ -165,7 +183,7 @@ class TaskController extends AbstractController
   {
     $task = $this->taskRepository->find($id);
     if (!$task) {
-      return $this->createApiResponse(false, 'Tarea no encontrada', Response::HTTP_NOT_FOUND);
+      return $this->jsonHelper->createApiResponse(false, 'Tarea no encontrada', Response::HTTP_NOT_FOUND);
     }
 
     try {
@@ -177,10 +195,10 @@ class TaskController extends AbstractController
       $this->entityManager->getConnection()->commit();
 
       $data = $this->serializer->serialize($task, 'json');
-      return $this->createApiResponse(true, 'Tarea eliminada con éxito', Response::HTTP_OK, ['task' => json_decode($data)]);
+      return $this->jsonHelper->createApiResponse(true, 'Tarea eliminada con éxito', Response::HTTP_OK, ['task' => json_decode($data)]);
     } catch (\Exception $e) {
       $this->entityManager->getConnection()->rollBack();
-      return $this->createApiResponse(false, 'Error eliminando de la tarea', Response::HTTP_INTERNAL_SERVER_ERROR, ['details' => $e->getMessage()]);
+      return $this->jsonHelper->createApiResponse(false, 'Error eliminando de la tarea', Response::HTTP_INTERNAL_SERVER_ERROR, ['details' => $e->getMessage()]);
     }
   }
 
@@ -189,14 +207,14 @@ class TaskController extends AbstractController
    */
   public function updateOrders(Request $request): Response
   {
-    $data = $this->getRequestData($request);
+    $data = $this->jsonHelper->getRequestData($request);
     if ($data instanceof Response) {
       return $data;
     }
 
     // Verifica que la estructura del JSON sea válida
     if (!isset($data['order']) || !is_array($data['order'])) {
-      return $this->createApiResponse(false, 'Datos inválidos', Response::HTTP_BAD_REQUEST);
+      return $this->jsonHelper->createApiResponse(false, 'Datos inválidos', Response::HTTP_BAD_REQUEST);
     }
 
     $tasksData = $data['order'];
@@ -208,14 +226,14 @@ class TaskController extends AbstractController
         if (!isset($item['id']) || !isset($item['order'])) {
           // Datos inválidos en el array de tareas
           $this->entityManager->getConnection()->rollBack();
-          return $this->createApiResponse(false, 'Datos de tareas inválidos', Response::HTTP_BAD_REQUEST);
+          return $this->jsonHelper->createApiResponse(false, 'Datos de tareas inválidos', Response::HTTP_BAD_REQUEST);
         }
 
         $task = $this->taskRepository->find($item['id']);
         if (!$task) {
           // Si una tarea no se encuentra, puedes decidir si continuar o abortar
           $this->entityManager->getConnection()->rollBack();
-          return $this->createApiResponse(false, 'Tarea con ID ' . $item['id'] . ' no encontrada', Response::HTTP_NOT_FOUND);
+          return $this->jsonHelper->createApiResponse(false, 'Tarea con ID ' . $item['id'] . ' no encontrada', Response::HTTP_NOT_FOUND);
         }
 
         $task->setNumOrder($item['order']);
@@ -224,77 +242,16 @@ class TaskController extends AbstractController
       $this->entityManager->flush();
       $this->entityManager->getConnection()->commit();
 
-      return $this->createApiResponse(true, 'Órdenes actualizadas con éxito', Response::HTTP_OK);
+      return $this->jsonHelper->createApiResponse(true, 'Órdenes actualizadas con éxito', Response::HTTP_OK);
     } catch (\Exception $e) {
       $this->entityManager->getConnection()->rollBack();
-      return $this->createApiResponse(false, 'Error actualizando órdenes', Response::HTTP_INTERNAL_SERVER_ERROR, ['details' => $e->getMessage()]);
+      return $this->jsonHelper->createApiResponse(false, 'Error actualizando órdenes', Response::HTTP_INTERNAL_SERVER_ERROR, ['details' => $e->getMessage()]);
     }
   }
 
   // FUNCIONES EXTRAS
 
-  private function validateTaskData(array $taskData): array
-  {
-    $errors = [];
+  
 
-    if (empty($taskData['title'])) {
-      $errors['title'] = 'El título es requerido';
-    }
-    if (empty($taskData['description'])) {
-      $errors['description'] = 'La descripción es requerida';
-    }
-    if (empty($taskData['priority'])) {
-      $errors['priority'] = 'La prioridad es requerida';
-    }
-
-    // Verifica la prioridad
-    $priority = $taskData['priority'] ?? Priority::PRIORITY_HIGHT->value;
-    $validPriorities = [
-      Priority::PRIORITY_HIGHT->value,
-      Priority::PRIORITY_MEDIUM->value,
-      Priority::PRIORITY_LOW->value
-    ];
-
-    if (!in_array($priority, $validPriorities, true)) {
-      $errors['priority'] = 'La prioridad no es válida. Los valores permitidos son alta, media o baja.';
-    }
-    return $errors;
-  }
-
-  private function getNewTaskOrder(): int
-  {
-    $maxOrder = $this->entityManager->createQueryBuilder()
-      ->select('MAX(t.num_order)')
-      ->from(Task::class, 't')
-      ->getQuery()
-      ->getSingleScalarResult();
-
-    return $maxOrder !== null ? $maxOrder + 1 : 1;
-  }
-
-  private function createApiResponse(bool $success, $message, int $statusCode, array $data = []): JsonResponse
-  {
-    $response = [
-      'success' => $success,
-      'message' => $message,
-    ];
-
-    if (!empty($data)) {
-      $response['data'] = $data;
-    }
-
-    return new JsonResponse($response, $statusCode);
-  }
-
-  private function getRequestData(Request $request): array|Response
-  {
-    $requestData = $request->getContent();
-    $taskData = json_decode($requestData, true);
-
-    if (json_last_error() !== JSON_ERROR_NONE) {
-      return $this->createApiResponse(false, 'JSON inválido', Response::HTTP_BAD_REQUEST);
-    }
-
-    return $taskData;
-  }
+  
 }

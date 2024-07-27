@@ -5,39 +5,31 @@ namespace App\Repository;
 use App\Entity\Task;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
+use Doctrine\ORM\EntityManagerInterface;
 
 /**
  * @extends ServiceEntityRepository<Task>
  */
 class TaskRepository extends ServiceEntityRepository
 {
-    public function __construct(ManagerRegistry $registry)
-    {
-        parent::__construct($registry, Task::class);
-    }
+  private $entityManager;
+  public function __construct(ManagerRegistry $registry, EntityManagerInterface $entityManager)
+  {
+    parent::__construct($registry, Task::class);
+    $this->entityManager = $entityManager;
+  }
 
-    //    /**
-    //     * @return Task[] Returns an array of Task objects
-    //     */
-    //    public function findByExampleField($value): array
-    //    {
-    //        return $this->createQueryBuilder('t')
-    //            ->andWhere('t.exampleField = :val')
-    //            ->setParameter('val', $value)
-    //            ->orderBy('t.id', 'ASC')
-    //            ->setMaxResults(10)
-    //            ->getQuery()
-    //            ->getResult()
-    //        ;
-    //    }
+  /**
+   * @return integer Returns an array of Task objects
+   */
+  public function getNewTaskOrder(): int
+  {
+    $maxOrder = $this->entityManager->createQueryBuilder()
+      ->select('MAX(t.num_order)')
+      ->from(Task::class, 't')
+      ->getQuery()
+      ->getSingleScalarResult();
 
-    //    public function findOneBySomeField($value): ?Task
-    //    {
-    //        return $this->createQueryBuilder('t')
-    //            ->andWhere('t.exampleField = :val')
-    //            ->setParameter('val', $value)
-    //            ->getQuery()
-    //            ->getOneOrNullResult()
-    //        ;
-    //    }
+    return $maxOrder !== null ? $maxOrder + 1 : 1;
+  }
 }
