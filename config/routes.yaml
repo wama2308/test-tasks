@@ -1,5 +1,34 @@
 controllers:
-    resource:
-        path: ../src/Controller/
-        namespace: App\Controller
-    type: attribute
+  resource:
+    path: ../src/Controller/
+    namespace: App\Controller
+  type: attribute
+task_api_index:
+  path: /api/tasks
+  controller: 'App\Controller\TaskController::index'
+  methods: ["GET"]
+
+task_api_create:
+  path: /api/tasks
+  controller: 'App\Controller\TaskController::create'
+  methods: ["POST"]
+
+task_api_update:
+  path: /api/tasks/{id}
+  controller: 'App\Controller\TaskController::update'
+  methods: ["PUT"]
+
+task_api_update_status:
+  path: /api/tasks/update-status/{id}
+  controller: 'App\Controller\TaskController::updateStatus'
+  methods: ["PUT"]
+
+task_api_delete_task:
+  path: /api/tasks/delete/{id}
+  controller: 'App\Controller\TaskController::deleteTask'
+  methods: ["PUT"]
+
+task_api_update_orders:
+  path: /api/tasks/update/orders
+  controller: 'App\Controller\TaskController::updateOrders'
+  methods: ["PUT"]
