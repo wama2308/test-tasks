@@ -37,14 +37,14 @@ class Task
   )]
   private ?string $priority = null;
 
-  #[ORM\Column(type: Types::BOOLEAN, options: ['default' => false])]
-  private bool $delete_task = false;
-
   #[ORM\Column(type: Types::DATETIME_MUTABLE)]
   private ?\DateTimeInterface $created_at = null;
 
   #[ORM\Column(type: Types::DATETIME_MUTABLE)]
   private ?\DateTimeInterface $updated_at = null;
+
+  #[ORM\Column(type: Types::DATETIME_MUTABLE, nullable: true)]
+  private ?\DateTimeInterface $delete_at = null;
 
   public function __construct()
   {
@@ -116,17 +116,6 @@ class Task
     return $this;
   }
 
-  public function isDeleteTask(): bool
-  {
-    return $this->delete_task;
-  }
-
-  public function setDeleteTask(bool $delete_task): static
-  {
-    $this->delete_task = $delete_task;
-    return $this;
-  }
-
   public function getCreatedAt(): ?\DateTimeInterface
   {
     return $this->created_at;
@@ -147,6 +136,18 @@ class Task
   public function setUpdatedAt(\DateTimeInterface $updated_at): static
   {
     $this->updated_at = $updated_at;
+
+    return $this;
+  }
+
+  public function getDeleteAt(): ?\DateTimeInterface
+  {
+    return $this->delete_at;
+  }
+
+  public function setDeleteAt(?\DateTimeInterface $delete_at): static
+  {
+    $this->delete_at = $delete_at;
 
     return $this;
   }

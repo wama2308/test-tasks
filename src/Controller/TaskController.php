@@ -32,7 +32,7 @@ class TaskController extends AbstractController
   private $validator;
   private $jsonHelper;
 
-  public function __construct(EntityManagerInterface $entityManager, TaskRepository $taskRepository, SerializerInterface $serializer, ValidatorInterface $validator, JsonHelper $jsonHelper )
+  public function __construct(EntityManagerInterface $entityManager, TaskRepository $taskRepository, SerializerInterface $serializer, ValidatorInterface $validator, JsonHelper $jsonHelper)
   {
     $this->entityManager = $entityManager;
     $this->taskRepository = $taskRepository;
@@ -44,15 +44,19 @@ class TaskController extends AbstractController
   /**
    * @Route("/", name="index", methods={"GET"})
    */
-  public function index(): Response
+  public function index(Request $request): Response
   {
-    $tasks = $this->taskRepository->findAll();
+    $isDeleted = $request->query->get('delete') !== null ? filter_var($request->query->get('delete'), FILTER_VALIDATE_BOOLEAN) : null;
+    $priority = $request->query->get('priority');
+
+    $tasks = $this->taskRepository->findByCriteria($isDeleted, $priority);
 
     $jsonTasks = $this->serializer->serialize($tasks, 'json');
 
     $responseArray = [
       'data' => [
-        'tasks' => json_decode($jsonTasks)
+        'tasks' => json_decode($jsonTasks),
+        'items' => count($tasks),
       ]
     ];
 
@@ -111,12 +115,16 @@ class TaskController extends AbstractController
    */
   public function update(Request $request, $id): Response
   {
+    $task = $this->taskRepository->find($id);
+    if (!$task) {
+      return $this->jsonHelper->createApiResponse(false, 'Tarea no encontrada', Response::HTTP_NOT_FOUND);
+    }
+
     $taskData = $this->jsonHelper->getRequestData($request);
     if ($taskData instanceof Response) {
       return $taskData;
     }
 
-    $task = new Task();
     $task->setTitle($taskData['title']);
     $task->setDescription($taskData['description']);
     $task->setPriority($taskData['priority']);
@@ -189,7 +197,7 @@ class TaskController extends AbstractController
     try {
       $this->entityManager->getConnection()->beginTransaction();
 
-      $task->setDeleteTask(true);
+      $task->setDeleteAt(new \DateTime());
 
       $this->entityManager->flush();
       $this->entityManager->getConnection()->commit();
@@ -248,10 +256,4 @@ class TaskController extends AbstractController
       return $this->jsonHelper->createApiResponse(false, 'Error actualizando órdenes', Response::HTTP_INTERNAL_SERVER_ERROR, ['details' => $e->getMessage()]);
     }
   }
-
-  // FUNCIONES EXTRAS
-
-  
-
-  
 }

@@ -20,6 +20,31 @@ class TaskRepository extends ServiceEntityRepository
   }
 
   /**
+   * @param bool|null $isDeleted
+   * @param string|null $priority
+   * @return Task[] Returns an array of Task objects
+   */
+  public function findByCriteria(?bool $isDeleted, ?string $priority)
+  {
+    $qb = $this->createQueryBuilder('t');
+
+    if ($isDeleted !== null) {
+      if ($isDeleted) {
+        $qb->andWhere('t.delete_at IS NOT NULL');
+      } else {
+        $qb->andWhere('t.delete_at IS NULL');
+      }
+    }
+
+    if ($priority !== null) {
+      $qb->andWhere('t.priority = :priority')
+        ->setParameter('priority', $priority);
+    }
+
+    return $qb->getQuery()->getResult();
+  }
+
+  /**
    * @return integer Returns an array of Task objects
    */
   public function getNewTaskOrder(): int
