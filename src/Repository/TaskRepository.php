@@ -24,16 +24,14 @@ class TaskRepository extends ServiceEntityRepository
    * @param string|null $priority
    * @return Task[] Returns an array of Task objects
    */
-  public function findByCriteria(?bool $isDeleted, ?string $priority)
+  public function findByParams(?bool $isDeleted, ?string $priority)
   {
     $qb = $this->createQueryBuilder('t');
 
-    if ($isDeleted !== null) {
-      if ($isDeleted) {
-        $qb->andWhere('t.delete_at IS NOT NULL');
-      } else {
-        $qb->andWhere('t.delete_at IS NULL');
-      }
+    if ($isDeleted !== null || $isDeleted === false) {
+      $qb->andWhere('t.delete_at IS NOT NULL');
+    } else {
+      $qb->andWhere('t.delete_at IS NULL');
     }
 
     if ($priority !== null) {
