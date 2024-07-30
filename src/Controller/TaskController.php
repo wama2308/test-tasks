@@ -48,8 +48,9 @@ class TaskController extends AbstractController
   {
     $isDeleted = $request->query->get('delete') !== null ? filter_var($request->query->get('delete'), FILTER_VALIDATE_BOOLEAN) : null;
     $priority = $request->query->get('priority');
+    $status = $request->query->get('status');
 
-    $tasks = $this->taskRepository->findByParams($isDeleted, $priority);
+    $tasks = $this->taskRepository->findByParams($isDeleted, $priority, $status);
 
     $jsonTasks = $this->serializer->serialize($tasks, 'json');
 
